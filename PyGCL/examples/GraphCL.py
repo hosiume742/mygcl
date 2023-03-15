@@ -72,14 +72,13 @@ class Encoder(torch.nn.Module):
 class Encoder_mask(torch.nn.Module):
     def __init__(self, train_mask, pf, augmentor):
         super(Encoder_mask, self).__init__()
-        self.train_mask = nn.Parameter(train_mask, requires_grad=True)
+        self.train_mask = nn.Parameter(train_mask).to('cuda')
         self.augmentor = augmentor
         self.pf = pf
 
     def forward(self, x, edge_index, batch):
         aug1, aug2 = self.augmentor
         x1, edge_index1, edge_weight1 = aug1(x, edge_index)
-        self.train_mask = self.train_mask.to('cuda')
         self.train_mask = torch.sigmoid(self.train_mask)
         self.train_mask = torch.where(self.train_mask < self.pf, 0, self.train_mask)
         print(self.train_mask)
