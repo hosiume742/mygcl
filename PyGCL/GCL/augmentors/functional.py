@@ -107,8 +107,6 @@ def drop_feature(x: torch.Tensor, drop_prob: float, drop_mask: torch.Tensor) -> 
 
     return x
 
-    return x
-
 
 def dropout_feature(x: torch.FloatTensor, drop_prob: float) -> torch.FloatTensor:
     return F.dropout(x, p=1. - drop_prob)
@@ -332,13 +330,14 @@ def drop_node(x:torch.Tensor, edge_index: torch.Tensor, edge_weight: Optional[to
     x = x.to('cuda')
     train_mask = train_mask.to('cuda')
     train_mask = torch.sigmoid(train_mask)
+    # print(train_mask)
     train_mask = torch.where(train_mask <keep_prob, 0, 1)
     # print(train_mask)
 
     num_nodes = edge_index.max().item() + 1
     train_mask = train_mask[0:num_nodes]
     train_mask = train_mask.nonzero().squeeze()
-    # subset = subset.long().to('cuda')
+
 
     edge_index, edge_weight = subgraph(train_mask, edge_index, edge_weight)
     x = x.clone()
@@ -347,9 +346,6 @@ def drop_node(x:torch.Tensor, edge_index: torch.Tensor, edge_weight: Optional[to
 
     return x, edge_index, edge_weight
 
-    # TODO: 根据trainingable mask 生成subgrpah
-
-    return edge_index, edge_weight
 
 def random_walk_subgraph(edge_index: torch.LongTensor, edge_weight: Optional[torch.FloatTensor] = None, batch_size: int = 1000, length: int = 10):
     num_nodes = edge_index.max().item() + 1

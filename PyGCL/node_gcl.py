@@ -70,6 +70,21 @@ class Encoder(torch.nn.Module):
         m2 = global_add_pool(x2, batch)
         return z, g, x1, x2, g1, g2
 
+def aug(x, edge_index, edge_weight, train_mask, pn):
+    x = x.to('cuda')
+    train_mask = torch.sigmoid(train_mask)
+    subset = torch.where(train_mask < pn, 0, 1)
+
+    num_nodes = edge_index.max().item() + 1
+    subset = subset[0:num_nodes]
+    subset = subset.nonzero().squeeze()
+
+    edge_index, edge_weight = subgraph(subset, edge_index, edge_weight)
+    x = x.clone()
+    for i in range(x.shape[0]):
+        if i not in edge_index: x[i, :] = 0
+    return x, edge_index, edge_weight
+
 class Encoder_mask(torch.nn.Module):
     def __init__(self, train_mask, pn, augmentor):
         super(Encoder_mask, self).__init__()
@@ -80,23 +95,23 @@ class Encoder_mask(torch.nn.Module):
     def forward(self, x, edge_index, batch):
         aug1, aug2 = self.augmentor
         x1, edge_index1, edge_weight1 = aug1(x, edge_index)
+        # x2, edge_index2, edge_weight2 = aug(x, edge_index, edge_weight1, self.train_mask, self.pn)
         x2 = x
         x2 = x2.to('cuda')
-        print('before', self.train_mask)
         self.train_mask = torch.sigmoid(self.train_mask)
-        print('sig', self.train_mask)
-        self.train_mask = torch.where(self.train_mask < self.pn, 0, 1)
-        print('where', self.train_mask)
+        print(self.train_mask)
+        subset = torch.where(self.train_mask < self.pn, 0, 1)
 
         num_nodes = edge_index.max().item() + 1
-        self.train_mask = self.train_mask[0:num_nodes]
-        self.train_mask = self.train_mask.nonzero().squeeze()
-        print('last', self.train_mask)
+        subset = subset[0:num_nodes]
+        subset = subset.nonzero().squeeze()
 
-        edge_index, edge_weight = subgraph(self.train_mask, edge_index, edge_weight1)
+        edge_index, edge_weight = subgraph(subset, edge_index, edge_weight1)
         x2 = x2.clone()
         for i in range(x2.shape[0]):
             if i not in edge_index: x2[i, :] = 0
+
+
         # x2, edge_index2, edge_weight2 = aug2(x, edge_index)
         m1 = global_add_pool(x1, batch)
         m2 = global_add_pool(x2, batch)
