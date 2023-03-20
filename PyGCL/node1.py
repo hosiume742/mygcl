@@ -178,7 +178,7 @@ def main():
     #         pbar.update()
     #         print(train_mask)
     with tqdm(total=3, desc='(T)') as pbar:
-        for epoch in range(1, 3):
+        for epoch in range(1, 4):
             loss = train_m(mask_model, loss_aug_fn, dataloader, optimizer_mask)
             print(loss)
             print(train_mask)

@@ -70,21 +70,21 @@ class Encoder(torch.nn.Module):
 
 
 class Encoder_mask(torch.nn.Module):
-    def __init__(self, train_mask, pf, augmentor):
+    def __init__(self, train_mask, augmentor):
         super(Encoder_mask, self).__init__()
         self.train_mask = nn.Parameter(train_mask).to('cuda')
         self.augmentor = augmentor
-        self.pf = pf
 
     def forward(self, x, edge_index, batch):
         aug1, aug2 = self.augmentor
         x1, edge_index1, edge_weight1 = aug1(x, edge_index)
-        self.train_mask = torch.sigmoid(self.train_mask)
-        self.train_mask = torch.where(self.train_mask < self.pf, 0, self.train_mask)
-        print(self.train_mask)
-
-        x2 = x*self.train_mask
-        # x2, edge_index2, edge_weight2 = aug2(x, edge_index)
+        # self.train_mask = torch.sigmoid(self.train_mask)
+        # self.train_mask = torch.where(self.train_mask < self.pf, 0, self.train_mask)
+        # print(self.train_mask)
+        #
+        # x2 = x*self.train_mask
+        x2, edge_index2, edge_weight2 = aug2(x, self.train_mask)
+        # print(self.train_mask)
         m1 = global_add_pool(x1, batch)
         m2 = global_add_pool(x2, batch)
         return m1, m2
@@ -167,18 +167,18 @@ def main():
     #                        A.NodeDropping(pn=0.1),
     #                        A.FeatureMasking(pf=0.1),
     #                        A.EdgeRemoving(pe=0.1)], 1)
-    aug2 = A.FeatureMasking(pf=0.1, train_mask=train_mask)
+    aug2 = A.FeatureMasking(train_mask=train_mask)
     gconv = GConv(input_dim=input_dim, hidden_dim=64, num_layers=2).to(device)
     encoder_model = Encoder(encoder=gconv, augmentor=(aug1, aug2)).to(device)
-    mask_model = Encoder_mask(train_mask=train_mask, pf=0.4, augmentor=(aug1, aug2)).to(device)
+    mask_model = Encoder_mask(train_mask=train_mask, augmentor=(aug1, aug2)).to(device)
     contrast_model = DualBranchContrast(loss=L.InfoNCE(tau=0.2), mode='G2G').to(device)
     #分布训练
     loss_aug_fn = torch.nn.CosineSimilarity(dim = 1)
     optimizer = Adam(encoder_model.parameters(), lr=0.01)
     optimizer_mask = Adam([train_mask], lr=0.01)
     #
-    with tqdm(total=10, desc='(T)') as pbar:
-        for epoch in range(1, 11):
+    with tqdm(total=50, desc='(T)') as pbar:
+        for epoch in range(1, 51):
             loss = train_m(mask_model, loss_aug_fn, dataloader, optimizer_mask)
             pbar.set_postfix({'loss': loss})
             pbar.update()

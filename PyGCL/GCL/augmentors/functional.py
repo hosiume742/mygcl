@@ -87,7 +87,7 @@ def multiinstance_mixup(x1: torch.Tensor, x2: torch.Tensor,
     return x_spurious, lambda_
 
 
-def drop_feature(x: torch.Tensor, drop_prob: float, drop_mask: torch.Tensor) -> torch.Tensor:
+def drop_feature(x: torch.Tensor, drop_mask: torch.Tensor=None) -> torch.Tensor:
     # device = x.device
     # print(drop_mask.shape)
     # drop_mask = torch.empty((x.size(1),), dtype=torch.float32).uniform_(0, 1) < drop_prob
@@ -101,9 +101,11 @@ def drop_feature(x: torch.Tensor, drop_prob: float, drop_mask: torch.Tensor) -> 
 
     device = x.device
     # drop_mask = torch.where(drop_mask < drop_prob, 0, drop_mask)
+    device = x.device
+    print(drop_mask)
     drop_mask = drop_mask.to(device)
-    x = x.clone()
-    x = x*drop_mask
+    drop_mask = torch.sigmoid(drop_mask)
+    x = torch.mul(drop_mask, x)
 
     return x
 
