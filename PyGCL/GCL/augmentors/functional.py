@@ -102,7 +102,7 @@ def drop_feature(x: torch.Tensor, drop_mask: torch.Tensor=None) -> torch.Tensor:
     device = x.device
     # drop_mask = torch.where(drop_mask < drop_prob, 0, drop_mask)
     device = x.device
-    print(drop_mask)
+    # print(drop_mask)
     drop_mask = drop_mask.to(device)
     drop_mask = torch.sigmoid(drop_mask)
     x = torch.mul(drop_mask, x)
@@ -321,7 +321,9 @@ def add_edge(edge_index: torch.Tensor, ratio: float) -> torch.Tensor:
     return coalesce_edge_index(edge_index)[0]
 
 
-def drop_node(x:torch.Tensor, edge_index: torch.Tensor, edge_weight: Optional[torch.Tensor] = None, train_mask: torch.Tensor=None,  keep_prob: float = 0.5) -> (torch.Tensor, Optional[torch.Tensor]):
+def drop_node(x:torch.Tensor, edge_index: torch.Tensor, edge_weight: Optional[torch.Tensor] = None, train_mask: torch.Tensor=None) -> (torch.Tensor, Optional[torch.Tensor]):
+
+    #origin drop_node
     # num_nodes = edge_index.max().item() + 1
     # probs = torch.tensor([keep_prob for _ in range(num_nodes)])
     # dist = Bernoulli(probs)
@@ -329,19 +331,29 @@ def drop_node(x:torch.Tensor, edge_index: torch.Tensor, edge_weight: Optional[to
     # subset = dist.sample().to(torch.bool).to(edge_index.device)
     #
     # edge_index, edge_weight = subgraph(subset, edge_index, edge_weight)
-    x = x.to('cuda')
+
+    #node1 drop_node
     train_mask = train_mask.to('cuda')
-    train_mask = torch.sigmoid(train_mask)
-    # print(train_mask)
-    train_mask = torch.where(train_mask <keep_prob, 0, 1)
-    # print(train_mask)
+    dist = Bernoulli(train_mask)
+    subset = dist.sample().to(torch.bool).to(edge_index.device)
 
-    num_nodes = edge_index.max().item() + 1
-    train_mask = train_mask[0:num_nodes]
-    train_mask = train_mask.nonzero().squeeze()
+    edge_index, edge_weight = subgraph(subset, edge_index, edge_weight)
 
-
-    edge_index, edge_weight = subgraph(train_mask, edge_index, edge_weight)
+    # Gumbel Softmax; soft submition(加权);
+    #node_gcl drop node
+    # x = x.to('cuda')
+    # train_mask = train_mask.to('cuda')
+    # train_mask = torch.sigmoid(train_mask)
+    # # print(train_mask)
+    # train_mask = torch.where(train_mask <keep_prob, 0, 1)
+    # # print(train_mask)
+    #
+    # num_nodes = edge_index.max().item() + 1
+    # train_mask = train_mask[0:num_nodes]
+    # train_mask = train_mask.nonzero().squeeze()
+    #
+    #
+    # edge_index, edge_weight = subgraph(train_mask, edge_index, edge_weight)
     x = x.clone()
     for i in range(x.shape[0]):
         if i not in edge_index: x[i,:] = 0

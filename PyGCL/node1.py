@@ -71,11 +71,10 @@ class Encoder(torch.nn.Module):
         return z, g, x1, x2, g1, g2
 
 class Encoder_mask(torch.nn.Module):
-    def __init__(self, train_mask, pn, augmentor):
+    def __init__(self, train_mask, augmentor):
         super(Encoder_mask, self).__init__()
         self.train_mask = nn.Parameter(train_mask).to('cuda')
         self.augmentor = augmentor
-        self.pn = pn
 
     def forward(self, x, edge_index, batch):
         aug1, aug2 = self.augmentor
@@ -155,15 +154,15 @@ def main():
     input_dim = max(dataset.num_features, 1)
 
     #定义train mask
-    train_mask = torch.randn((4933,), dtype=torch.float32, requires_grad=True)
-    # print(train_mask)
+    # train_mask = torch.randn((4933,), dtype=torch.float32, requires_grad=True)
+    train_mask = torch.tensor([0.2 for _ in range(4933)], requires_grad=True)
 
     aug1 = A.Identity()
-    aug2 = A.NodeDropping(pn=0.6, train_mask=train_mask)
+    aug2 = A.NodeDropping(train_mask=train_mask)
     # aug2 = A.FeatureMasking(pf=0.1, train_mask=train_mask)
     gconv = GConv(input_dim=input_dim, hidden_dim=64, num_layers=2).to(device)
     encoder_model = Encoder(encoder=gconv, augmentor=(aug1, aug2), train_mask=train_mask).to(device)
-    mask_model = Encoder_mask(train_mask=train_mask, pn=0.4, augmentor=(aug1, aug2)).to(device)
+    mask_model = Encoder_mask(train_mask=train_mask, augmentor=(aug1, aug2)).to(device)
     contrast_model = DualBranchContrast(loss=L.InfoNCE(tau=0.2), mode='G2G').to(device)
     #分布训练
     loss_aug_fn = torch.nn.CosineSimilarity(dim = 1)
@@ -177,10 +176,9 @@ def main():
     #         pbar.set_postfix({'loss': loss})
     #         pbar.update()
     #         print(train_mask)
-    with tqdm(total=3, desc='(T)') as pbar:
-        for epoch in range(1, 4):
+    with tqdm(total=10, desc='(T)') as pbar:
+        for epoch in range(1, 11):
             loss = train_m(mask_model, loss_aug_fn, dataloader, optimizer_mask)
-            print(loss)
             print(train_mask)
             pbar.set_postfix({'loss': loss})
             pbar.update()

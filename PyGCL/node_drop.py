@@ -57,31 +57,33 @@ class Encoder(torch.nn.Module):
         self.augmentor = augmentor
 
     def forward(self, x, edge_index, batch):
-        aug1, aug2 = self.augmentor
-        x1, edge_index1, edge_weight1 = aug1(x, edge_index)
-        x2, edge_index2, edge_weight2 = aug2(x, edge_index)
+        aug = self.augmentor
+        _, _, x1, x2 = aug(x, edge_index, batch)
         z, g = self.encoder(x, edge_index, batch)
-        z1, g1 = self.encoder(x1, edge_index1, batch)
-        z2, g2 = self.encoder(x2, edge_index2, batch)
-        # return z, g, z1, z2, g1, g2
-
-#         分布
+        z1, g1 = self.encoder(x1, edge_index, batch)
+        z2, g2 = self.encoder(x2, edge_index, batch)
         return z, g, z1, z2, g1, g2
 
 
-class Encoder_mask(torch.nn.Module):
-    def __init__(self, train_mask, augmentor):
-        super(Encoder_mask, self).__init__()
-        self.train_mask = nn.Parameter(train_mask).to('cuda')
-        self.augmentor = augmentor
+class Node_drop(torch.nn.Module):
+    def __init__(self, input_dim, hidden_dim):
+        super(Node_drop, self).__init__()
+        self.gin1 = make_gin_conv(input_dim, hidden_dim)
+        self.gin2 = make_gin_conv(hidden_dim, 1)
 
     def forward(self, x, edge_index, batch):
-        aug1, aug2 = self.augmentor
-        x1, edge_index1, edge_weight1 = aug1(x, edge_index)
-        x2, edge_index2, edge_weight2 = aug2(x, self.train_mask)
+        num_nodes, num_feature = x.size()
+        x1 = x
+        x2 = x
+        x2 = self.gin1(x2, edge_index)
+        x2 = F.relu(x2)
+        x2 = self.gin2(x2,edge_index)
+        x2 = F.sigmoid(x2)
+        x2 = x2.expand(num_nodes, num_feature)
+        x2 = x2 * x
         m1 = global_add_pool(x1, batch)
         m2 = global_add_pool(x2, batch)
-        return m1, m2
+        return m1, m2, x1,x2
 
 def train_m(mask_model, loss_aug_fn, dataloader, optimizer):
     mask_model.train()
@@ -94,7 +96,7 @@ def train_m(mask_model, loss_aug_fn, dataloader, optimizer):
             num_nodes = data.batch.size(0)
             data.x = torch.ones((num_nodes, 1), dtype=torch.float32, device=data.batch.device)
 
-        m1, m2= mask_model(data.x, data.edge_index, data.batch)
+        m1, m2, _, _ = mask_model(data.x, data.edge_index, data.batch)
         loss_aug = loss_aug_fn(m1, m2)
         loss_aug = loss_aug.sum(dim=0)/128
         loss_aug.requires_grad_(True)
@@ -151,29 +153,23 @@ def main():
     dataset = TUDataset(path, name='NCI1')
     dataloader = DataLoader(dataset, batch_size=128)
     input_dim = max(dataset.num_features, 1)
-    #定义train mask
-    train_mask = torch.randn((dataset.num_features,), dtype=torch.float32, requires_grad=True)
-    # print(train_mask)
 
-    aug1 = A.Identity()
-
-    # aug2 = A.RandomChoice([A.RWSampling(num_seeds=1000, walk_length=10),
-    #                        A.NodeDropping(pn=0.1),
-    #                        A.FeatureMasking(pf=0.1),
-    #                        A.EdgeRemoving(pe=0.1)], 1)
-    aug2 = A.FeatureMasking(train_mask=train_mask)
+    mask_model = Node_drop(input_dim=input_dim, hidden_dim=64).to(device)
+    # 使用两种不同的增强方式
+    # aug1 = A.Identity()
+    # aug2 = A.NodeDropping(train_mask=train_mask)
     gconv = GConv(input_dim=input_dim, hidden_dim=64, num_layers=2).to(device)
-    encoder_model = Encoder(encoder=gconv, augmentor=(aug1, aug2)).to(device)
-    mask_model = Encoder_mask(train_mask=train_mask, augmentor=(aug1, aug2)).to(device)
+    encoder_model = Encoder(encoder=gconv, augmentor= mask_model).to(device)
+
     contrast_model = DualBranchContrast(loss=L.InfoNCE(tau=0.2), mode='G2G').to(device)
 
     loss_aug_fn = torch.nn.CosineSimilarity(dim = 1)
     optimizer = Adam(encoder_model.parameters(), lr=0.01)
-    optimizer_mask = Adam([train_mask], lr=0.01)
+    optimizer_mask = Adam(mask_model.parameters(), lr=0.01)
     #
 
     with tqdm(total=100, desc='(T)') as pbar:
-        for epoch in range(1, 101):
+        for epoch in range(1, 10):
             loss_aug = train_m(mask_model, loss_aug_fn, dataloader, optimizer_mask)
             loss = train(encoder_model, contrast_model, dataloader, optimizer)
             pbar.set_postfix({'loss_aug': loss_aug, 'loss':loss})
@@ -184,5 +180,4 @@ def main():
 
 
 if __name__ == '__main__':
-    for i in range(3):
         main()
