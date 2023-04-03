@@ -26,3 +26,7 @@ aug2参考GCL/augment/node_dropping以及GCL/augment/functional中的drop_node
 上次上课老师指出问题：没有让drop比例值pn为可训练的，可能是由于这个造成无法训练，但是也想请老师看看我functional中的drop_node
 的代码以及生成子图的方式有没有问题~
 ![](PyGCL/test/4.png)
+
+###2023.4.3更新
+重写了node_drop和fature_mask，全部都单独定义为nn.Module，并且按照周六上课所说，加入了argparse模块来调参
+文件：node_drop_divide.py
