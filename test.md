@@ -1,12 +1,12 @@
-## 代码问题记录
+# 代码问题记录
 
-### feature_mask
+## feature_mask
 
 今天改动了一下代码，好像可以训练了，具体训练情况还没有实验，看起来似乎是训练起来了。
 ![](PyGCL/test/5.png)
 
 mask在改变，同时loss也在减小。
-### node_drop
+## node_drop
 
 1.运行PyGCL/node_gcl.py
 
@@ -27,6 +27,23 @@ aug2参考GCL/augment/node_dropping以及GCL/augment/functional中的drop_node
 的代码以及生成子图的方式有没有问题~
 ![](PyGCL/test/4.png)
 
-###2023.4.3更新
+## 2023.4.3更新
 重写了node_drop和fature_mask，全部都单独定义为nn.Module，并且按照周六上课所说，加入了argparse模块来调参
+
 文件：node_drop_divide.py
+
+## 2023.4.4更新
+加入argparse模块和logging模块进行shell调参
+### 分布训练
+divide_run.sh  ==>  divide_train.py
+
+### 联合训练
+joint_run.sh   ==>  joint_train.py
+
+### 每个epoch内分布训练
+run.sh  ==>  train.py
+##接下来要解决的问题
+### 1. drop_node过拟合
+drop_node过程中容易将全部节点删除，需要添加正则化项对删除节点数加以限制
+### 2. 边扰动的数据增强方式
+利用注意力机制进行边扰动
